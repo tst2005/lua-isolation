@@ -1,4 +1,4 @@
-do local sources, priorities = {}, {};sources["compat_env"]=([===[-- <pack compat_env> --
+do local sources, priorities = {}, {};assert(not sources["compat_env"])sources["compat_env"]=([===[-- <pack compat_env> --
 --[[
   compat_env - see README for details.
   (c) 2012 David Manura.  Licensed under Lua 5.1/5.2 terms (MIT license).
@@ -144,8 +144,8 @@ end
 
 
 return M
-]===]):gsub('\\([%]%[]===[%]%[])','%1')
-sources["bit.numberlua"]=([===[-- <pack bit.numberlua> --
+]===]):gsub('\\([%]%[]===)\\([%]%[])','%1%2')
+assert(not sources["bit.numberlua"])sources["bit.numberlua"]=([===[-- <pack bit.numberlua> --
 --[[
 
 LUA MODULE
@@ -691,12 +691,16 @@ function M.bit.bswap(x)
 end
 
 return M
-]===]):gsub('\\([%]%[]===[%]%[])','%1')
+]===]):gsub('\\([%]%[]===)\\([%]%[])','%1%2')
 local add
 if not pcall(function() add = require"aioruntime".add end) then
         local loadstring=loadstring; local preload = require"package".preload
         add = function(name, rawcode)
-                preload[name] = function(...) return loadstring(rawcode)(...) end
+		if not preload[name] then
+		        preload[name] = function(...) return loadstring(rawcode)(...) end
+		else
+			print("WARNING: overwrite "..name)
+		end
         end
 end
 for name, rawcode in pairs(sources) do add(name, rawcode, priorities[name]) end
