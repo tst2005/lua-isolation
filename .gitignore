@@ -1,3 +1,4 @@
 /.cache*
 /TRY
 /thirdparty/git/*
+/aio.lua

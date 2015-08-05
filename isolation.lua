@@ -1,4 +1,4 @@
-do local sources = {};sources["compat_env"]=([===[-- <pack compat_env> --
+do local sources, priorities = {}, {};sources["compat_env"]=([===[-- <pack compat_env> --
 --[[
   compat_env - see README for details.
   (c) 2012 David Manura.  Licensed under Lua 5.1/5.2 terms (MIT license).
@@ -692,8 +692,14 @@ end
 
 return M
 ]===]):gsub('\\([%]%[]===[%]%[])','%1')
-local loadstring=loadstring; local preload = require"package".preload
-for name, rawcode in pairs(sources) do preload[name]=function(...)return loadstring(rawcode)(...)end end
+local add
+if not pcall(function() add = require"aioruntime".add end) then
+        local loadstring=loadstring; local preload = require"package".preload
+        add = function(name, rawcode)
+                preload[name] = function(...) return loadstring(rawcode)(...) end
+        end
+end
+for name, rawcode in pairs(sources) do add(name, rawcode, priorities[name]) end
 end;
 local ce = require("compat_env")
 

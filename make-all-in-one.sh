@@ -7,7 +7,7 @@ cd -- "$(dirname "$0")" || exit 1
 
 #headn=$(grep -nh '^_=nil$' bin/featuredlua |head -n 1 |cut -d: -f1)
 
-LUA_PATH="thirdparty/git/tst2005/lua-?/?.lua;;" \
+LUA_PATH="?.lua;hirdparty/git/tst2005/lua-?/?.lua;;" \
 lua -e '
 local aio = require "aio"
 aio.mode("raw2")
