@@ -1,5 +1,3 @@
-local ce = require("compat_env")
-
 
 local function merge(dest, source)
 	for k,v in pairs(source) do
@@ -15,74 +13,74 @@ local function keysfrom(source, keys)
 	return t
 end
 
-
--- make the list of currently loaded modules (without restricted.*)
---local package = require("package")
---local loadlist = {}
---for modname in pairs(package.loaded) do
---	if not modname:find("^restricted%.") then
---		loadlist[#loadlist+1] = modname
---	end
---end
-
---[[ lua 5.1
-cpath   ./?.so;/usr/local/lib/lua/5.1/?.so;/usr/lib/x86_64-linux-gnu/lua/5.1/?.so;/usr/lib/lua/5.1/?.so;/usr/local/lib/lua/5.1/loadall.so
-path    ./?.lua;/usr/local/share/lua/5.1/?.lua;/usr/local/share/lua/5.1/?/init.lua;/usr/local/lib/lua/5.1/?.lua;/usr/local/lib/lua/5.1/?/init.lua;/usr/share/lua/5.1/?.lua;/usr/share/lua/5.1/?/init.lua
-config  "/\n;\n?\n!\n-\n"
-preload table: 0x3865c40
-loaded  table: 0x3863bd0
-loaders table: 0x38656b0
-loadlib function: 0x38655f0
-seeall  function: 0x3865650
-]]--
---[[ lua 5.2
-cpath   /usr/local/lib/lua/5.2/?.so;/usr/lib/x86_64-linux-gnu/lua/5.2/?.so;/usr/lib/lua/5.2/?.so;/usr/local/lib/lua/5.2/loadall.so;./?.so
-path    /usr/local/share/lua/5.2/?.lua;/usr/local/share/lua/5.2/?/init.lua;/usr/local/lib/lua/5.2/?.lua;/usr/local/lib/lua/5.2/?/init.lua;./?.lua;/usr/share/lua/5.2/?.lua;/usr/share/lua/5.2/?/init.lua;./?.lua
-config  "/\n;\n?\n!\n-\n"
-preload table: 0x3059560
-loaded  table: 0x3058840
-loaders table: 0x3059330 <- compat stuff ??? == searchers
-loadlib function: 0x4217d0
-seeall  function: 0x4213c0
-
-searchpath      function: 0x421b10
-searchers       table: 0x3059330
-]]--
-
-local function new_package(preload, loaded, searchers)
-	local preload, loaded, searchers = preload or {}, loaded or {}, searchers or {}
-	local package = {}
-	package.cpath = ""
-	package.path = ""
-	package.config = "/\n;\n?\n!\n-\n"
-	package.preload = preload
-	package.loaded = loaded
-	package.searchers = searchers
-	package.loaders = package.searchers -- compat
-	--package.loadlib
-	--package.seeall
-	return package
-end
-
-local t_package_wanted = {
-"bit32",
-"coroutine",
-"debug",
-"io",
-"math",
-"os",
-"string",
-"table",
-}
-
-local function populate_package(loaded, t_package_wanted)
-	for i,modname in ipairs(t_package_wanted) do
+local function populate_package(loaded, modnames)
+	for i,modname in ipairs(modnames) do
 		loaded[modname] = require("restricted."..modname)
 	end
 	return loaded
 end
 
-local g_content = {
+local function setup_g(g, config)
+	local g = merge(g, keysfrom(_G, config.g_content))
+	g._G = g -- self
+end
+local function setup_package(package, config)
+	package.config	= require"package".config or "/\n;\n?\n!\n-\n"
+	package.cpath	= "" -- nil?
+	package.path	= "./?.lua;./?/init.lua"
+	package.loaders	= package.searchers -- compat
+	package.loadlib	= nil
+end
+local function cross_setup_g_package(g, package, config)
+	local loaded = package.loaded
+	loaded._G	= g		-- add _G as loaded modules
+	
+	-- global register all modules
+	--for k,v in pairs(loaded) do g[k] = v end
+	--g.debug = nil -- except debug
+
+	if config.package == "minimal" then
+		populate_package(loaded, {"table", "string"})
+	elseif config.package == "default" then
+		populate_package(loaded, package_wanted)
+	end
+	g.table		= loaded.table	-- _G.table
+	g.string	= loaded.string	-- _G.string
+
+end
+
+local defaultconfig = {}
+
+local function new_env(config)
+	config = config or defaultconfig
+	package_wanted = config.t_package_wanted
+
+	local g = {}
+
+	local req, package = require("newpackage").new()
+	assert(req("package") == package)
+	local preload, loaded, searchers = package.preload, package.loaded, package.searchers
+	assert(loaded.package == package)
+
+	setup_g(g, config)
+	setup_package(package, config)
+	cross_setup_g_package(g, package, config)
+
+	g.require = req
+
+	return g
+end
+
+local function run(f, env)
+	local ce = require("compat_env")
+	return ce.load(f, nil, nil, newenv)
+end
+
+
+defaultconfig.t_package_wanted = {
+	"bit32", "coroutine", "debug", "io", "math", "os", "string", "table",
+}
+defaultconfig.g_content = {
 	"_VERSION", "assert",
 	--collectgarbage --dofile
 	"error",
@@ -96,48 +94,9 @@ local g_content = {
 	"setmetatable", "tonumber", "tostring", "type", "unpack", "xpcall",
 }
 
-local function new_g(t_keys)
-	local g = merge({}, keysfrom(_G, g_content))
-	g._G = g -- self
-	return g
-end
-
-local function new_require_with(preload, loaded, searchers)
-	local r = function(modname)
-		if loaded[modname] then
-			return loaded[modname]
-		end
-		return require(modname)
-	end
-	return r
-end
-
-local function new_env(config)
-	package_wanted = t_package_wanted
-
-	local g = new_g()
-
-	local preload, loaded, searchers = {}, {}, {}
-	local req = new_require_with(preload, loaded, searchers)
-	local p = new_package(preload, loaded, searchers)
-	loaded.package	= p -- add package as loaded modules
-	loaded._G	= g -- add _G      as loaded modules
-
-	if config.package ~= "minimal" then
-		populate_package(loaded, package_wanted)
-	end
-	g.require = req
-	g.table = loaded.table --
-	g.string = loaded.string --
-
-	return g
-end
-
-local function run(f, env)
-	return ce.load(f, nil, nil, newenv)
-end
 local _M = {
 	new = new_env,
 	run = run,
+	defaultconfig = defaultconfig,
 }
 return _M
