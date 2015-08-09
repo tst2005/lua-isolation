@@ -18,10 +18,12 @@ Long term goal
 See also
 ========
 
-Similar projet :
+Similar projet
 * [sandbox.lua](https://github.com/APItools/sandbox.lua)
 * [lua-modjail](https://github.com/siffiejoe/lua-modjail)
 
+About potential futur API :
+* [rings](https://github.com/keplerproject/rings) that has master/slave API.
 
 License
 =======
