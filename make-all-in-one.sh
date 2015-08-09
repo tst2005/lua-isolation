@@ -1,0 +1,1 @@
+../lua-aio-scripts/isolation/make-all-in-one.sh
