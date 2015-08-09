@@ -1,16 +1,21 @@
 local os = require("os")
 
-local _os = {}
-_os.clock	= os.clock
-_os.date	= os.date
-_os.difftime	= os.difftime
---_os.execute	=
---_os.exit	= os.exit
-_os.getenv	= os.getenv -- expose the FS
---_os.remove	=
---_os.rename	=
---_os.setlocale	= 
-_os.time	= os.time
---_os.tmpname	=
+local _M = {}
 
-return _os
+for k,v in pairs{
+	"clock",
+	"date", -- FIXME: On non-POSIX systems, this function may be not thread safe
+	"difftime",
+--execute
+--exit
+--getenv
+--remove
+--rename
+--setlocale
+	"time",
+--tmpname
+} do
+	_M[k]=v
+end
+
+return _M

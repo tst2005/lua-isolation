@@ -55,12 +55,11 @@ local function cross_setup_g_package(g, package, config)
 
 end
 
-local defaultconfig = {}
 
 local function new_env(_G, conf)
 	assert(_G)
 	local config = {}
-	for k,v in pairs(defaultconfig) do config[k]=v end
+	for k,v in pairs(_M.defaultconfig) do config[k]=v end
 	for k,v in pairs(conf) do config[k]=v end
 	assert( config.package )
 	assert( config.package_wanted )
@@ -87,24 +86,7 @@ local function run(f, env)
 	return ce.load(f, nil, nil, newenv)
 end
 
-
-defaultconfig.package_wanted = {
-	"bit32", "coroutine", "debug", "io", "math", "os", "string", "table",
-}
-defaultconfig.g_content = {
-	"_VERSION", "assert",
-	--collectgarbage --dofile
-	"error",
-	--getfenv
-	"getmetatable", "ipairs",
-	--load --loadfile --loadstring --module
-	"next", "pairs", "pcall", "print",
-	--rawequal --rawget --rawset
-	"select",
-	--setfenv
-	"setmetatable", "tonumber", "tostring", "type", "unpack", "xpcall",
-}
-defaultconfig.package = "all"
+local defaultconfig = require "isolation.defaults".defaultconfig
 
 local _M = {
 	new = new_env,

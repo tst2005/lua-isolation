@@ -1,38 +1,15 @@
 local math = require("math")
-local _math = {}
-for k,v in pairs(math) do
-	_math[k] = v
+local _M = {}
+
+for k,v in pairs({
+	"abs", "acos", "asin", "atan", "atan2", "ceil", "cos", "cosh",
+	"deg", "exp", "floor", "fmod", "frexp", "huge", "ldexp", "log",
+	"log10", "max", "min", "modf", "pi", "pow", "rad", "random",
+	--"randomseed",
+	"sin", "sinh", "sqrt", "tan", "tanh",
+}) do
+	_M[k] = v
 end
 
---math.abs
---math.acos
---math.asin
---math.atan
---math.atan2
---math.ceil
---math.cos
---math.cosh
---math.deg
---math.exp
---math.floor
---math.fmod
---math.frexp
---math.huge
---math.ldexp
---math.log
---math.log10
---math.max
---math.min
---math.modf
---math.pi
---math.pow
---math.rad
---math.random
---math.randomseed
---math.sin
---math.sinh
---math.sqrt
---math.tan
---math.tanh
-
-return _math -- lock metatable ?
+-- lock metatable ?
+return _M

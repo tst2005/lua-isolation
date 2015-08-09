@@ -1,6 +1,6 @@
 local io = require("io")
 
-local _io = {}
+local _M = {}
 --io.close
 --io.flush
 --io.input
@@ -15,4 +15,4 @@ local _io = {}
 --io.tmpfile
 --io.type
 --io.write
-return _io
+return _M
