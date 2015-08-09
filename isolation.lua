@@ -1,4 +1,433 @@
-do local sources, priorities = {}, {};assert(not sources["compat_env"])sources["compat_env"]=([===[-- <pack compat_env> --
+do local sources, priorities = {}, {};assert(not sources["newpackage"])sources["newpackage"]=([===[-- <pack newpackage> --
+
+-- ----------------------------------------------------------
+
+--_COMPAT51 = "Compat-5.1 R5"
+--local loadlib = loadlib
+--local setmetatable = setmetatable
+--local setfenv = setfenv
+
+local assert, error, ipairs, type = assert, error, ipairs, type
+local find, format, gmatch, gsub, sub = string.find, string.format, string.gmatch or string.gfind, string.gsub, string.sub
+local loadfile = loadfile
+
+local function lassert(cond, msg, lvl)
+	if not cond then
+		error(msg, lvl+1)
+	end
+	return cond
+end
+
+-- this function is used to get the n-th line of the str, should be improved !!
+local function string_line(str, n)
+	if not str then return end
+	local f = string.gmatch(str, "(.-)\n")
+	local r
+	for i = 1,n+1 do
+		local v = f()
+		if not v then break end
+		r = v
+	end
+	return r
+end
+
+local function bigfunction_new(with_loaded, with_preloaded)
+
+--
+local _PACKAGE = {}
+local _LOADED = with_loaded or {}
+local _PRELOAD = with_preloaded or {}
+local _SEARCHERS  = {}
+
+--
+-- looks for a file `name' in given path
+--
+local function _searchpath(name, path, sep, rep)
+	sep = sep or '.'
+	rep = rep or string_line(_PACKAGE.config, 1) or '/'
+	local LUA_PATH_MARK = '?'
+	local LUA_DIRSEP = '/'
+	name = gsub(name, "%.", LUA_DIRSEP)
+	lassert(type(path) == "string", format("path must be a string, got %s", type(pname)), 2)
+	for c in gmatch(path, "[^;]+") do
+		c = gsub(c, "%"..LUA_PATH_MARK, name)
+		local f = io.open(c) -- FIXME: use virtual FS here ???
+		if f then
+			f:close()
+			return c
+		end
+	end
+	return nil -- not found
+end
+
+--
+-- check whether library is already loaded
+--
+local function searcher_preload(name)
+	lassert(type(name) == "string", format("bad argument #1 to `require' (string expected, got %s)", type(name)), 2)
+	lassert(type(_PRELOAD) == "table", "`package.preload' must be a table", 2)
+	return _PRELOAD[name]
+end
+
+--
+-- Lua library searcher
+--
+local function searcher_Lua(name)
+	lassert(type(name) == "string", format("bad argument #1 to `require' (string expected, got %s)", type(name)), 2)
+	local filename = _searchpath(name, _PACKAGE.path)
+	if not filename then
+		return false
+	end
+	local f, err = loadfile(filename)
+	if not f then
+		error(format("error loading module `%s' (%s)", name, err))
+	end
+	return f
+end
+
+--
+-- iterate over available searchers
+--
+local function iload(modname, searchers)
+	lassert(type(searchers) == "table", "`package.searchers' must be a table", 2)
+	local msg = ""
+	for _, searcher in ipairs(searchers) do
+		local loader, param = searcher(modname)
+		if type(loader) == "function" then
+			return loader, param -- success
+		end
+		if type(loader) == "string" then
+			-- `loader` is actually an error message
+			msg = msg .. loader
+		end
+	end
+	error("module `" .. modname .. "' not found: "..msg, 2)
+end
+
+--
+-- new require
+--
+local function _require(modname)
+
+	local function checkmodname(s)
+		local t = type(s)
+		if t == "string" then
+		        return s
+		elseif t == "number" then
+			return tostring(s)
+		else
+			error("bad argument #1 to `require' (string expected, got "..t..")", 3)
+		end
+	end
+
+	modname = checkmodname(modname)
+	local p = _LOADED[modname]
+	if p then -- is it there?
+		return p -- package is already loaded
+	end
+
+	local loader, param = iload(modname, _SEARCHERS)
+
+	local res = loader(modname, param)
+	if res ~= nil then
+		p = res
+	elseif not _LOADED[modname] then
+		p = true
+	end
+
+	_LOADED[modname] = p
+	return p
+end
+
+
+_SEARCHERS[#_SEARCHERS+1] = searcher_preload
+_SEARCHERS[#_SEARCHERS+1] = searcher_Lua
+--_SEARCHERS[#_SEARCHERS+1] = searcher_C
+--_SEARCHERS[#_SEARCHERS+1] = searcher_Croot,
+
+_LOADED.package = _PACKAGE
+do
+	local package = _PACKAGE
+
+	--package.config	= nil -- setup by parent
+	--package.cpath		= "" -- setup by parent
+	package.loaded		= _LOADED
+	--package.loadlib
+	--package.path		= "./?.lua;./?/init.lua" -- setup by parent
+	package.preload		= _PRELOAD
+	package.searchers	= _SEARCHERS
+	package.searchpath	= _searchpath
+end
+return _require, _PACKAGE
+end -- big function
+
+return {new = bigfunction_new}
+
+-- ----------------------------------------------------------
+
+-- make the list of currently loaded modules (without restricted.*)
+--local package = require("package")
+--local loadlist = {}
+--for modname in pairs(package.loaded) do
+--	if not modname:find("^restricted%.") then
+--		loadlist[#loadlist+1] = modname
+--	end
+--end
+
+--[[ lua 5.1
+cpath   ./?.so;/usr/local/lib/lua/5.1/?.so;/usr/lib/x86_64-linux-gnu/lua/5.1/?.so;/usr/lib/lua/5.1/?.so;/usr/local/lib/lua/5.1/loadall.so
+path    ./?.lua;/usr/local/share/lua/5.1/?.lua;/usr/local/share/lua/5.1/?/init.lua;/usr/local/lib/lua/5.1/?.lua;/usr/local/lib/lua/5.1/?/init.lua;/usr/share/lua/5.1/?.lua;/usr/share/lua/5.1/?/init.lua
+config  "/\n;\n?\n!\n-\n"
+preload table: 0x3865c40
+loaded  table: 0x3863bd0
+loaders table: 0x38656b0
+loadlib function: 0x38655f0
+seeall  function: 0x3865650
+]]--
+--[[ lua 5.2
+cpath   /usr/local/lib/lua/5.2/?.so;/usr/lib/x86_64-linux-gnu/lua/5.2/?.so;/usr/lib/lua/5.2/?.so;/usr/local/lib/lua/5.2/loadall.so;./?.so
+path    /usr/local/share/lua/5.2/?.lua;/usr/local/share/lua/5.2/?/init.lua;/usr/local/lib/lua/5.2/?.lua;/usr/local/lib/lua/5.2/?/init.lua;./?.lua;/usr/share/lua/5.2/?.lua;/usr/share/lua/5.2/?/init.lua;./?.lua
+config  "/\n;\n?\n!\n-\n"
+preload table: 0x3059560
+loaded  table: 0x3058840
+loaders table: 0x3059330 <- compat stuff ??? == searchers
+loadlib function: 0x4217d0
+seeall  function: 0x4213c0
+
+searchpath      function: 0x421b10
+searchers       table: 0x3059330
+]]--
+
+--
+-- new package.seeall function
+--
+--function _package_seeall(module)
+--	local t = type(module)
+--	assert(t == "table", "bad argument #1 to package.seeall (table expected, got "..t..")")
+--	local meta = getmetatable(module)
+--	if not meta then
+--		meta = {}
+--		setmetatable(module, meta)
+--	end
+--	meta.__index = _G
+--end
+
+--
+-- new module function
+--
+--local function _module(modname, ...)
+--	local ns = _LOADED[modname]
+--	if type(ns) ~= "table" then
+--		-- findtable
+--		local function findtable(t, f)
+--			assert(type(f)=="string", "not a valid field name ("..tostring(f)..")")
+--			local ff = f.."."
+--			local ok, e, w = find(ff, '(.-)%.', 1)
+--			while ok do
+--				local nt = rawget(t, w)
+--				if not nt then
+--					nt = {}
+--					t[w] = nt
+--				elseif type(t) ~= "table" then
+--					return sub(f, e+1)
+--				end
+--				t = nt
+--				ok, e, w = find(ff, '(.-)%.', e+1)
+--			end
+--			return t
+--		end
+--		ns = findtable(_G, modname)
+--		if not ns then
+--			error(format("name conflict for module '%s'", modname), 2)
+--		end
+--		_LOADED[modname] = ns
+--	end
+--	if not ns._NAME then
+--		ns._NAME = modname
+--		ns._M = ns
+--		ns._PACKAGE = gsub(modname, "[^.]*$", "")
+--	end
+--	setfenv(2, ns)
+--	for i, f in ipairs(arg) do
+--		f(ns)
+--	end
+--end
+
+
+--local POF = 'luaopen_'
+--local LUA_IGMARK = ':'
+--
+--local function mkfuncname(name)
+--	local LUA_OFSEP = '_'
+--	name = gsub(name, "^.*%"..LUA_IGMARK, "")
+--	name = gsub(name, "%.", LUA_OFSEP)
+--	return POF..name
+--end
+--
+--local function old_mkfuncname(name)
+--	local OLD_LUA_OFSEP = ''
+--	--name = gsub(name, "^.*%"..LUA_IGMARK, "")
+--	name = gsub(name, "%.", OLD_LUA_OFSEP)
+--	return POF..name
+--end
+--
+----
+---- C library searcher
+----
+--local function searcher_C(name)
+--	lassert(type(name) == "string", format(
+--		"bad argument #1 to `require' (string expected, got %s)", type(name)), 2)
+--	local filename = _searchpath(name, _PACKAGE.cpath)
+--	if not filename then
+--		return false
+--	end
+--	local funcname = mkfuncname(name)
+--	local f, err = loadlib(filename, funcname)
+--	if not f then
+--		funcname = old_mkfuncname(name)
+--		f, err = loadlib(filename, funcname)
+--		if not f then
+--			error(format("error loading module `%s' (%s)", name, err))
+--		end
+--	end
+--	return f
+--end
+--
+--local function searcher_Croot(name)
+--	local p = gsub(name, "^([^.]*).-$", "%1")
+--	if p == "" then
+--		return
+--	end
+--	local filename = _searchpath(p, "cpath")
+--	if not filename then
+--		return
+--	end
+--	local funcname = mkfuncname(name)
+--	local f, err, where = loadlib(filename, funcname)
+--	if f then
+--		return f
+--	elseif where ~= "init" then
+--		error(format("error loading module `%s' (%s)", name, err))
+--	end
+--end
+
+
+]===]):gsub('\\([%]%[]===)\\([%]%[])','%1%2')
+assert(not sources["restricted.debug"])sources["restricted.debug"]=([===[-- <pack restricted.debug> --
+
+local _debug = {}
+return _debug
+]===]):gsub('\\([%]%[]===)\\([%]%[])','%1%2')
+assert(not sources["restricted.bit32"])sources["restricted.bit32"]=([===[-- <pack restricted.bit32> --
+return {}
+]===]):gsub('\\([%]%[]===)\\([%]%[])','%1%2')
+assert(not sources["restricted.io"])sources["restricted.io"]=([===[-- <pack restricted.io> --
+local io = require("io")
+
+local _io = {}
+--io.close
+--io.flush
+--io.input
+--io.lines
+--io.open
+--io.output
+--io.popen
+--io.read
+--io.stderr
+--io.stdin
+--io.stdout
+--io.tmpfile
+--io.type
+--io.write
+return _io
+]===]):gsub('\\([%]%[]===)\\([%]%[])','%1%2')
+assert(not sources["restricted.os"])sources["restricted.os"]=([===[-- <pack restricted.os> --
+local os = require("os")
+
+local _os = {}
+_os.clock	= os.clock
+_os.date	= os.date
+_os.difftime	= os.difftime
+--_os.execute	=
+--_os.exit	= os.exit
+_os.getenv	= os.getenv -- expose the FS
+--_os.remove	=
+--_os.rename	=
+--_os.setlocale	= 
+_os.time	= os.time
+--_os.tmpname	=
+
+return _os
+]===]):gsub('\\([%]%[]===)\\([%]%[])','%1%2')
+assert(not sources["restricted.table"])sources["restricted.table"]=([===[-- <pack restricted.table> --
+
+return require("table") -- lock metatable ?
+]===]):gsub('\\([%]%[]===)\\([%]%[])','%1%2')
+assert(not sources["restricted._file"])sources["restricted._file"]=([===[-- <pack restricted._file> --
+local file = require("file")
+
+local _file = {}
+--file:close
+--file:flush
+--file:lines
+--file:read
+--file:seek
+--file:setvbuf
+--file:write
+return _file
+]===]):gsub('\\([%]%[]===)\\([%]%[])','%1%2')
+assert(not sources["restricted.string"])sources["restricted.string"]=([===[-- <pack restricted.string> --
+-- string = (table)
+-- metatable(string) = table.__index = string
+
+return string -- lock metatable ?
+]===]):gsub('\\([%]%[]===)\\([%]%[])','%1%2')
+assert(not sources["restricted.coroutine"])sources["restricted.coroutine"]=([===[-- <pack restricted.coroutine> --
+
+local _debug = {}
+return _debug
+]===]):gsub('\\([%]%[]===)\\([%]%[])','%1%2')
+assert(not sources["restricted.math"])sources["restricted.math"]=([===[-- <pack restricted.math> --
+local math = require("math")
+local _math = {}
+for k,v in pairs(math) do
+	_math[k] = v
+end
+
+--math.abs
+--math.acos
+--math.asin
+--math.atan
+--math.atan2
+--math.ceil
+--math.cos
+--math.cosh
+--math.deg
+--math.exp
+--math.floor
+--math.fmod
+--math.frexp
+--math.huge
+--math.ldexp
+--math.log
+--math.log10
+--math.max
+--math.min
+--math.modf
+--math.pi
+--math.pow
+--math.rad
+--math.random
+--math.randomseed
+--math.sin
+--math.sinh
+--math.sqrt
+--math.tan
+--math.tanh
+
+return _math -- lock metatable ?
+]===]):gsub('\\([%]%[]===)\\([%]%[])','%1%2')
+assert(not sources["compat_env"])sources["compat_env"]=([===[-- <pack compat_env> --
 --[[
   compat_env - see README for details.
   (c) 2012 David Manura.  Licensed under Lua 5.1/5.2 terms (MIT license).
@@ -705,8 +1134,6 @@ if not pcall(function() add = require"aioruntime".add end) then
 end
 for name, rawcode in pairs(sources) do add(name, rawcode, priorities[name]) end
 end;
-local ce = require("compat_env")
-
 
 local function merge(dest, source)
 	for k,v in pairs(source) do
@@ -715,6 +1142,8 @@ local function merge(dest, source)
 	return dest
 end
 local function keysfrom(source, keys)
+	assert(type(source)=="table")
+	assert(type(keys)=="table")
 	local t = {}
 	for i,k in ipairs(keys) do
 		t[k] = source[k]
@@ -722,74 +1151,83 @@ local function keysfrom(source, keys)
 	return t
 end
 
-
--- make the list of currently loaded modules (without restricted.*)
---local package = require("package")
---local loadlist = {}
---for modname in pairs(package.loaded) do
---	if not modname:find("^restricted%.") then
---		loadlist[#loadlist+1] = modname
---	end
---end
-
---[[ lua 5.1
-cpath   ./?.so;/usr/local/lib/lua/5.1/?.so;/usr/lib/x86_64-linux-gnu/lua/5.1/?.so;/usr/lib/lua/5.1/?.so;/usr/local/lib/lua/5.1/loadall.so
-path    ./?.lua;/usr/local/share/lua/5.1/?.lua;/usr/local/share/lua/5.1/?/init.lua;/usr/local/lib/lua/5.1/?.lua;/usr/local/lib/lua/5.1/?/init.lua;/usr/share/lua/5.1/?.lua;/usr/share/lua/5.1/?/init.lua
-config  "/\n;\n?\n!\n-\n"
-preload table: 0x3865c40
-loaded  table: 0x3863bd0
-loaders table: 0x38656b0
-loadlib function: 0x38655f0
-seeall  function: 0x3865650
-]]--
---[[ lua 5.2
-cpath   /usr/local/lib/lua/5.2/?.so;/usr/lib/x86_64-linux-gnu/lua/5.2/?.so;/usr/lib/lua/5.2/?.so;/usr/local/lib/lua/5.2/loadall.so;./?.so
-path    /usr/local/share/lua/5.2/?.lua;/usr/local/share/lua/5.2/?/init.lua;/usr/local/lib/lua/5.2/?.lua;/usr/local/lib/lua/5.2/?/init.lua;./?.lua;/usr/share/lua/5.2/?.lua;/usr/share/lua/5.2/?/init.lua;./?.lua
-config  "/\n;\n?\n!\n-\n"
-preload table: 0x3059560
-loaded  table: 0x3058840
-loaders table: 0x3059330 <- compat stuff ??? == searchers
-loadlib function: 0x4217d0
-seeall  function: 0x4213c0
-
-searchpath      function: 0x421b10
-searchers       table: 0x3059330
-]]--
-
-local function new_package(preload, loaded, searchers)
-	local preload, loaded, searchers = preload or {}, loaded or {}, searchers or {}
-	local package = {}
-	package.cpath = ""
-	package.path = ""
-	package.config = "/\n;\n?\n!\n-\n"
-	package.preload = preload
-	package.loaded = loaded
-	package.searchers = searchers
-	package.loaders = package.searchers -- compat
-	--package.loadlib
-	--package.seeall
-	return package
-end
-
-local t_package_wanted = {
-"bit32",
-"coroutine",
-"debug",
-"io",
-"math",
-"os",
-"string",
-"table",
-}
-
-local function populate_package(loaded, t_package_wanted)
-	for i,modname in ipairs(t_package_wanted) do
+local function populate_package(loaded, modnames)
+	for i,modname in ipairs(modnames) do
 		loaded[modname] = require("restricted."..modname)
 	end
 	return loaded
 end
 
-local g_content = {
+local function setup_g(g, _G, config)
+	assert(type(g)=="table")
+	assert(type(_G)=="table")
+	assert(type(config)=="table")
+	assert(type(config.g_content)=="table")
+	local g = merge(g, keysfrom(_G, config.g_content))
+	g._G = g -- self
+end
+local function setup_package(package, config)
+	package.config	= require"package".config or "/\n;\n?\n!\n-\n"
+	package.cpath	= "" -- nil?
+	package.path	= "./?.lua;./?/init.lua"
+	package.loaders	= package.searchers -- compat
+	package.loadlib	= nil
+end
+local function cross_setup_g_package(g, package, config)
+	local loaded = package.loaded
+	loaded._G	= g		-- add _G as loaded modules
+	
+	-- global register all modules
+	--for k,v in pairs(loaded) do g[k] = v end
+	--g.debug = nil -- except debug
+
+	if config.package == "minimal" then
+		populate_package(loaded, {"table", "string"})
+	elseif config.package == "all" then
+		populate_package(loaded, config.package_wanted)
+	end
+	g.table		= loaded.table	-- _G.table
+	g.string	= loaded.string	-- _G.string
+
+end
+
+local defaultconfig = {}
+
+local function new_env(_G, conf)
+	assert(_G)
+	local config = {}
+	for k,v in pairs(defaultconfig) do config[k]=v end
+	for k,v in pairs(conf) do config[k]=v end
+	assert( config.package )
+	assert( config.package_wanted )
+	assert( config.g_content )
+
+	local g = {}
+
+	local req, package = require("newpackage").new()
+	assert(req("package") == package)
+	local preload, loaded, searchers = package.preload, package.loaded, package.searchers
+	assert(loaded.package == package)
+
+	setup_g(g, _G, config)
+	setup_package(package, config)
+	cross_setup_g_package(g, package, config)
+
+	g.require = req
+
+	return g
+end
+
+local function run(f, env)
+	local ce = require("compat_env")
+	return ce.load(f, nil, nil, newenv)
+end
+
+
+defaultconfig.package_wanted = {
+	"bit32", "coroutine", "debug", "io", "math", "os", "string", "table",
+}
+defaultconfig.g_content = {
 	"_VERSION", "assert",
 	--collectgarbage --dofile
 	"error",
@@ -802,49 +1240,12 @@ local g_content = {
 	--setfenv
 	"setmetatable", "tonumber", "tostring", "type", "unpack", "xpcall",
 }
+defaultconfig.package = "all"
 
-local function new_g(t_keys)
-	local g = merge({}, keysfrom(_G, g_content))
-	g._G = g -- self
-	return g
-end
-
-local function new_require_with(preload, loaded, searchers)
-	local r = function(modname)
-		if loaded[modname] then
-			return loaded[modname]
-		end
-		return require(modname)
-	end
-	return r
-end
-
-local function new_env(config)
-	package_wanted = t_package_wanted
-
-	local g = new_g()
-
-	local preload, loaded, searchers = {}, {}, {}
-	local req = new_require_with(preload, loaded, searchers)
-	local p = new_package(preload, loaded, searchers)
-	loaded.package	= p -- add package as loaded modules
-	loaded._G	= g -- add _G      as loaded modules
-
-	if config.package ~= "minimal" then
-		populate_package(loaded, package_wanted)
-	end
-	g.require = req
-	g.table = loaded.table --
-	g.string = loaded.string --
-
-	return g
-end
-
-local function run(f, env)
-	return ce.load(f, nil, nil, newenv)
-end
 local _M = {
 	new = new_env,
+	--new_package = function(...) return require"newpackage".new(...) end,
 	run = run,
+	defaultconfig = defaultconfig,
 }
 return _M
