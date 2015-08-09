@@ -93,6 +93,7 @@ defaultconfig.g_content = {
 	--setfenv
 	"setmetatable", "tonumber", "tostring", "type", "unpack", "xpcall",
 }
+defaultconfig.package = "default"
 
 local _M = {
 	new = new_env,

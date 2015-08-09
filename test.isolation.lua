@@ -15,4 +15,4 @@ do
 		assert(type(os[k])=="function")
 	end
 end
-
+print("ok")

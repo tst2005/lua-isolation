@@ -7,7 +7,7 @@
 --local setfenv = setfenv
 
 local assert, error, ipairs, type = assert, error, ipairs, type
-local find, format, gmatch, gsub, sub = string.find, string.format, string.gmatch or string.gfind. string.gsub, string.sub
+local find, format, gmatch, gsub, sub = string.find, string.format, string.gmatch or string.gfind, string.gsub, string.sub
 local loadfile = loadfile
 
 local function lassert(cond, msg, lvl)
@@ -30,10 +30,10 @@ local function string_line(str, n)
 	return r
 end
 
-local function bigfunction()
+local function bigfunction(with_this_package)
 
 --
-local _PACKAGE = {}
+local _PACKAGE = with_this_package or {}
 local _LOADED = {}
 local _PRELOAD = {}
 local _SEARCHERS  = {}
