@@ -30,12 +30,12 @@ local function string_line(str, n)
 	return r
 end
 
-local function bigfunction(with_this_package)
+local function bigfunction_new(with_loaded, with_preloaded)
 
 --
-local _PACKAGE = with_this_package or {}
-local _LOADED = {}
-local _PRELOAD = {}
+local _PACKAGE = {}
+local _LOADED = with_loaded or {}
+local _PRELOAD = with_preloaded or {}
 local _SEARCHERS  = {}
 
 --
@@ -160,7 +160,7 @@ end
 return _require, _PACKAGE
 end -- big function
 
-return {new = bigfunction}
+return {new = bigfunction_new}
 
 -- ----------------------------------------------------------
 
