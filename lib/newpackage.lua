@@ -1,7 +1,6 @@
 
 -- ----------------------------------------------------------
 
---_COMPAT51 = "Compat-5.1 R5"
 --local loadlib = loadlib
 --local setmetatable = setmetatable
 --local setfenv = setfenv

@@ -1,7 +1,7 @@
 
 local string = require "string"
 local _M = {}
-for k,v in pairs{
+for i,k in pairs{
 	"byte",
 	"char",
 	"find",
@@ -15,7 +15,7 @@ for k,v in pairs{
 	"sub",
 	"upper",
 } do
-	_M[k]=v
+	_M[k]=string[k]
 end
 
 return setmetatable({}, {

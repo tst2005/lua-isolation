@@ -5,6 +5,7 @@ _M.insert = table.insert
 _M.maxn = table.maxn
 _M.remove = table.remove
 _M.sort = table.sort
-_M.unpack = table.pack
+_M.unpack = table.unpack
+_M.pack = table.pack
 
 return _M

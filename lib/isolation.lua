@@ -1,3 +1,4 @@
+local _M = {}
 
 local function merge(dest, source)
 	for k,v in pairs(source) do
@@ -19,15 +20,51 @@ local function populate_package(loaded, modnames)
 	for i,modname in ipairs(modnames) do
 		loaded[modname] = require("restricted."..modname)
 	end
-	return loaded
+end
+
+
+-- getmetatable - UNSAFE
+-- - Note that getmetatable"" returns the metatable of strings.
+--   Modification of the contents of that metatable can break code outside the sandbox that relies on this string behavior.
+--   Similar cases may exist unless objects are protected appropriately via __metatable. Ideally __metatable should be immutable. 
+-- UNSAFE : http://lua-users.org/wiki/SandBoxes
+local function make_safe_getsetmetatable(unsafe_getmetatable, unsafe_setmetatable)
+	local safe_getmetatable, safe_setmetatable
+	do
+		local mt_string = unsafe_getmetatable("")
+		safe_getmetatable = function(t)
+			local mt = unsafe_getmetatable(t)
+			if mt_string == mt then
+				return false
+			end
+			return mt
+		end
+		safe_setmetatable = function(t, mt)
+			if mt_string == t or mt_string == mt then
+				return t
+			end
+			return unsafe_setmetatable(t, mt)
+		end
+	end
+	return safe_getmetatable, safe_setmetatable
 end
 
 local function setup_g(g, _G, config)
 	assert(type(g)=="table")
 	assert(type(_G)=="table")
 	assert(type(config)=="table")
-	assert(type(config.g_content)=="table")
-	local g = merge(g, keysfrom(_G, config.g_content))
+
+	for i,k in ipairs{
+		"_VERSION", "assert", "error", "ipairs", "next", "pairs",
+		"pcall", "select", "tonumber", "tostring", "type", "unpack","xpcall",
+	} do
+		g[k]=_G[k]
+	end
+
+	local safe_getmetatable, safe_setmetatable = make_safe_getsetmetatable(_G.getmetatable,_G.setmetatable)
+	g.getmetatable = assert(safe_getmetatable)
+	g.setmetatable = assert(safe_setmetatable)
+	g.print = function() end
 	g._G = g -- self
 end
 local function setup_package(package, config)
@@ -50,9 +87,11 @@ local function cross_setup_g_package(g, package, config)
 	elseif config.package == "all" then
 		populate_package(loaded, config.package_wanted)
 	end
-	g.table		= loaded.table	-- _G.table
-	g.string	= loaded.string	-- _G.string
-
+	for i,k in ipairs(config.g_content) do
+		if loaded[k] then
+			g[k] = loaded[k]
+		end
+	end
 end
 
 
@@ -69,8 +108,7 @@ local function new_env(_G, conf)
 
 	local req, package = require("newpackage").new()
 	assert(req("package") == package)
-	local preload, loaded, searchers = package.preload, package.loaded, package.searchers
-	assert(loaded.package == package)
+	assert(package.loaded.package == package)
 
 	setup_g(g, _G, config)
 	setup_package(package, config)
@@ -88,10 +126,8 @@ end
 
 local defaultconfig = require "isolation.defaults".defaultconfig
 
-local _M = {
-	new = new_env,
-	--new_package = function(...) return require"newpackage".new(...) end,
-	run = run,
-	defaultconfig = defaultconfig,
-}
+_M.new = new_env
+_M.run = run
+_M.defaultconfig = defaultconfig
+
 return _M
