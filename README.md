@@ -8,8 +8,17 @@ It's harder to have a full emulated `require` and package management inside this
 
 Isolation allow you to create a new isolated package management (including require).
 
-Hybride mode
-------------
+Difference between native Lua environment
+=========================================
+
+I decide to follow :
+ * the Lua 5.2 (5.3?) `require` implementation, it means a `require` without sentinel.
+ * the package table items follow the Lua 5.3 names, with the `package.loaders` == `package.searchers` and the `paackage.searchpath` is implemented.
+ * the new created environment does only contains `table` and `string`. All other module must be called with the `require` function.
+
+
+Alternative use
+---------------
 
 You are also able to make a new `require` attached to the current `package` table.
 The isolation's `require` follow the Lua5.2+ one.
