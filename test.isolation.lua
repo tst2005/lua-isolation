@@ -1,35 +1,45 @@
-local isolation = require "isolation"
+local cwtest = require "cwtest"
 
--- I. new isolated env with new require
-do
+local T = cwtest.new()
 
-local e = isolation.new(_G, {package="all"})
-assert(e ~= _G)
-assert(e._G == e)
-assert(e.require)
-assert(e.require ~= _G.require)
+T:start("I. new isolated env with new require"); do
+	local isolation = require "isolation"
+	local e = isolation.new(_G, {package="all"})
 
-assert(e.require("_G") == e)
-do
-	local os = e.require("os")
-	for i,k in ipairs({"clock", "difftime", "time"}) do
-		assert(os[k])
-		assert(type(os[k])=="function")
+	T:yes(e ~= _G)
+	T:yes(e._G == e)
+	T:yes(e.require)
+	T:yes(e.require ~= _G.require)
+
+	T:yes(e.require("_G") == e)
+	do
+		local os = e.require("os")
+		for i,k in ipairs({"clock", "difftime", "time"}) do
+			assert(os[k])
+			assert(type(os[k])=="function")
+		end
 	end
-end
-end -- </.I>
+	for i,name in ipairs{ "string", "table", } do
+		T:yes(e[name])
+		T:yes(e.require(name) == e[name])
+	end
+	for i,name in ipairs{ "bit32", "coroutine", "debug", "io", "math", "os", } do
+		T:no(e[name])
+		T:yes(e.require(name))
+	end
 
+end T:done()
 
--- II. new require with the current package
-do
-	local package = require "package"
+-- TODO: move this part to test.newpackage.lua ?
+T:start("II. new require with the current package"); do
+	local native_package = require "package" -- native package
 
 	require "isolation" -- -- usefull in case of aio preloading...
 	local require_new = require "newpackage".new
 
 	local req = require_new(package.loaded, package.preload)
-	assert(req"package" ~= package)
-	assert(req"os")
-end
+	T:yes(req"package" ~= package)
+	T:yes(req"os")
+end T:done()
 
-print("ok")
+T:exit()
