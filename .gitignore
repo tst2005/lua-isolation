@@ -1,4 +1,6 @@
 /.cache*
 /TRY
-/thirdparty/git/*
+/thirdparty/*
 /aio.lua
+/aioruntime.lua
+/mom.lua
