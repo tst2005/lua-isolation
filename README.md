@@ -42,6 +42,59 @@ Tested with Lua 5.1, LuaJIT(5.1), Lua5.2.
 Should be compatible with Lua 5.3.
 
 
+How to use it
+=============
+
+Create a instance
+-----------------
+
+With `new` inspired from [rings.new(env)](http://keplerproject.github.io/rings/manual.html#master_functions)
+
+```lua
+local inst = require "isolation".new()
+```
+
+
+Execute some code
+-----------------
+
+
+Inspired from [slave:dostring(string_luacode, ...)](http://keplerproject.github.io/rings/manual.html#master_functions)
+`dostring` is like `pcall`.
+
+```lua
+local ok, res =  inst:dostring("return 123")
+assert(ok == true and res == 123)
+```
+
+```lua
+local ok, res1, res2 =  inst:dostring("return 123, '456'")
+assert(ok == true and res1 == 123 and res2 == "456")
+```
+
+Inspired from [sandbox.run](https://github.com/APItools/sandbox.lua#sandboxrun)
+For now I have issue with run fnd unction.
+The current `run` support string.
+
+```lua
+local result = inst:run("return 123")
+assert(result == 123)
+```
+
+```lua
+local slave_require = inst:run("return require")
+assert(slave_require"os".exit == nil)
+```
+
+For now I have issue with run function.
+I make a `runf` for running function
+```lua
+local result = inst:runf(function() return 123 end)
+assert(result == 123)
+```
+
+
+
 See also
 ========
 
