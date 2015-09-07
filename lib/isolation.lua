@@ -26,7 +26,7 @@ end
 -- getmetatable - UNSAFE
 -- - Note that getmetatable"" returns the metatable of strings.
 --   Modification of the contents of that metatable can break code outside the sandbox that relies on this string behavior.
---   Similar cases may exist unless objects are protected appropriately via __metatable. Ideally __metatable should be immutable. 
+--   Similar cases may exist unless objects are protected appropriately via __metatable. Ideally __metatable should be immutable.
 -- UNSAFE : http://lua-users.org/wiki/SandBoxes
 local function make_safe_getsetmetatable(unsafe_getmetatable, unsafe_setmetatable)
 	local safe_getmetatable, safe_setmetatable
@@ -77,7 +77,7 @@ end
 local function cross_setup_g_package(g, package, config)
 	local loaded = package.loaded
 	loaded["_G"]	= g		-- add _G as loaded modules
-	
+
 	-- global register all modules
 	--for k,v in pairs(loaded) do g[k] = v end
 	--g.debug = nil -- except debug
