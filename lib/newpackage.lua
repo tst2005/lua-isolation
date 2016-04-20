@@ -5,8 +5,10 @@
 --local setmetatable = setmetatable
 --local setfenv = setfenv
 
-local assert, error, ipairs, type = assert, error, ipairs, type
-local find, format, gmatch, gsub, sub = string.find, string.format, string.gmatch or string.gfind, string.gsub, string.sub
+--local assert =  assert
+local error, ipairs, type = error, ipairs, type
+--local find, format, gmatch, gsub, sub = string.find, string.format, string.gmatch or string.gfind, string.gsub, string.sub
+local format, gmatch, gsub = string.format, string.gmatch or string.gfind, string.gsub
 local loadfile = loadfile
 
 local function lassert(cond, msg, lvl)
@@ -17,17 +19,29 @@ local function lassert(cond, msg, lvl)
 end
 
 -- this function is used to get the n-th line of the str, should be improved !!
+--local function string_line(str, n)
+--	if not str then return end
+--	local f = string.gmatch(str, "(.-)\n")
+--	local r
+--	for _i = 1,n+1 do
+--		local v = f()
+--		if not v then break end
+--		r = v
+--	end
+--	return r
+--end
+
 local function string_line(str, n)
-	if not str then return end
-	local f = string.gmatch(str, "(.-)\n")
-	local r
-	for i = 1,n+1 do
-		local v = f()
-		if not v then break end
-		r = v
+	if str and n and n >= 1 then
+		return string.match(str, ((n >= 2) and (".-\n"):rep(n-1) or "").."(.-)\n")
 	end
-	return r
 end
+assert( string_line("aa\n", 1) == "aa")
+assert( string_line("aa\nbb\n", 2) == "bb")
+assert( string_line("aa\nbb\ncc\n", 2) == "bb")
+assert( string_line("aa\n\nbb\ncc\n", 3) == "bb")
+
+
 
 local function bigfunction_new(with_loaded, with_preloaded)
 
@@ -46,7 +60,7 @@ local function _searchpath(name, path, sep, rep)
 	local LUA_PATH_MARK = '?'
 	local LUA_DIRSEP = '/'
 	name = gsub(name, "%.", LUA_DIRSEP)
-	lassert(type(path) == "string", format("path must be a string, got %s", type(pname)), 2)
+	lassert(type(path) == "string", format("path must be a string, got %s", type(path)), 2)
 	for c in gmatch(path, "[^;]+") do
 		c = gsub(c, "%"..LUA_PATH_MARK, name)
 		local f = io.open(c) -- FIXME: use virtual FS here ???
@@ -131,7 +145,15 @@ local function _require(modname)
 		p = res
 	elseif not _LOADED[modname] then
 		p = true
+	else
+		p = _LOADED[name]
 	end
+-- If the loader returns any non-nil value,		=> true/false/{}/*~=nil
+-- require assigns the returned value to package.loaded[modname].	=> assign !
+
+-- If the loader does not return a non-nil value	=> nil
+-- and has not assigned any value to package.loaded[modname], => le module peux avoir injecté une valeure
+-- then require assigns true to this entry. In any case, require returns the final value of package.loaded[modname].
 
 	_LOADED[modname] = p
 	return p
